@@ -15,6 +15,11 @@ var combat_timer = 0.0
 var is_in_combat = false
 var turn_speed = 10.0
 
+var attack_cooldown = 0.0
+var is_attacking = false
+
+@onready var weapon_socket = $VisualPivot/WeaponSocket
+
 func _ready():
 	spring_arm.top_level = true
 	spring_arm.add_excluded_object(self.get_rid())
@@ -39,9 +44,17 @@ func _physics_process(delta):
 	spring_arm.global_position = spring_arm.global_position.lerp(target_pos, 20.0 * delta)
 
 	# Combat State Logic
+	if attack_cooldown > 0:
+		attack_cooldown -= delta
+
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		is_in_combat = true
 		combat_timer = 0.0
+		
+		# Kích hoạt chém nếu dùng chuột trái
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_attacking and attack_cooldown <= 0:
+			perform_attack()
+			
 	elif is_in_combat:
 		combat_timer += delta
 		if combat_timer >= 0.5:
@@ -98,3 +111,35 @@ func _physics_process(delta):
 		pass # Allow free-look
 
 	move_and_slide()
+
+func perform_attack():
+	is_attacking = true
+	attack_cooldown = 0.6
+	
+	# Lấy Hitbox của thanh kiếm và bật lên
+	var sword_hitbox = weapon_socket.get_node("Sword/Hitbox")
+	if sword_hitbox:
+		if sword_hitbox.has_method("clear_hit_history"):
+			sword_hitbox.clear_hit_history()
+		sword_hitbox.monitoring = true
+		
+	# Tạo Animation chém kiếm bằng Tween
+	var tween = create_tween()
+	
+	# Vung kiếm ra sau (Windup)
+	tween.tween_property(weapon_socket, "rotation_degrees:x", 120.0, 0.1)
+	tween.parallel().tween_property(weapon_socket, "rotation_degrees:z", 45.0, 0.1)
+	
+	# Chém mạnh tới trước (Swing)
+	tween.tween_property(weapon_socket, "rotation_degrees:x", -30.0, 0.15)
+	tween.parallel().tween_property(weapon_socket, "rotation_degrees:z", -45.0, 0.15)
+	
+	# Thu kiếm về (Recovery)
+	tween.tween_property(weapon_socket, "rotation_degrees:x", 90.0, 0.2).set_delay(0.1)
+	tween.parallel().tween_property(weapon_socket, "rotation_degrees:z", 0.0, 0.2).set_delay(0.1)
+	
+	tween.tween_callback(func():
+		is_attacking = false
+		if sword_hitbox:
+			sword_hitbox.monitoring = false
+	)

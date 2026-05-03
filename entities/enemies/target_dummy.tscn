@@ -1,0 +1,83 @@
+[gd_scene load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://entities/enemies/target_dummy.gd" id="1_dummy"]
+[ext_resource type="PackedScene" path="res://components/stats/stats_manager.tscn" id="2_stats"]
+[ext_resource type="Script" path="res://components/combat/hurtbox.gd" id="3_hurtbox"]
+[ext_resource type="Script" path="res://components/ui/floating_health_bar.gd" id="4_healthbar"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+height = 1.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+resource_local_to_scene = true
+albedo_color = Color(0.4, 0.4, 0.4, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+material = SubResource("StandardMaterial3D_body")
+height = 1.5
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_hurtbox"]
+radius = 0.6
+height = 1.6
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_head"]
+radius = 0.35
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_head"]
+resource_local_to_scene = true
+albedo_color = Color(0.8, 0.4, 0.1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_head"]
+material = SubResource("StandardMaterial3D_head")
+radius = 0.35
+height = 0.7
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_head_hurtbox"]
+radius = 0.45
+
+[node name="TargetDummy" type="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("1_dummy")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="BodyMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+mesh = SubResource("CapsuleMesh_body")
+
+[node name="HeadMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.85, 0)
+mesh = SubResource("SphereMesh_head")
+
+[node name="HeadCollision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.85, 0)
+shape = SubResource("SphereShape3D_head")
+
+[node name="StatsManager" parent="." instance=ExtResource("2_stats")]
+
+[node name="Hurtbox" type="Area3D" parent="." node_paths=PackedStringArray("stats_manager")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("3_hurtbox")
+stats_manager = NodePath("../StatsManager")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hurtbox"]
+shape = SubResource("CapsuleShape3D_hurtbox")
+
+[node name="HeadHurtbox" type="Area3D" parent="." node_paths=PackedStringArray("stats_manager")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.85, 0)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("3_hurtbox")
+stats_manager = NodePath("../StatsManager")
+damage_multiplier = 1.75
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HeadHurtbox"]
+shape = SubResource("SphereShape3D_head_hurtbox")
+
+[node name="FloatingHealthBar" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+script = ExtResource("4_healthbar")

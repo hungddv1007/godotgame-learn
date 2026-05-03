@@ -29,6 +29,7 @@ var current_shield: float = 0.0
 # 2. Khối Trạng thái & Tags
 var active_tags: Dictionary = {}
 var active_effects: Array[StatusEffect] = []
+var regen_timer: float = 0.0
 
 func _ready():
 	_init_stat("max_hp", 100.0)
@@ -109,18 +110,23 @@ func apply_status_effect(effect: StatusEffect):
 	active_effects.append(new_effect)
 
 func _process(delta: float):
-	# Xử lý Hồi phục Vitals
-	if current_hp < get_stat("max_hp") and current_hp > 0:
-		current_hp = min(current_hp + get_stat("hp_regen") * delta, get_stat("max_hp"))
-		health_changed.emit(current_hp, get_stat("max_hp"))
+	# Xử lý Hồi phục Vitals (10 lần mỗi giây để tránh spam bộ nhớ)
+	regen_timer += delta
+	if regen_timer >= 0.1:
+		var tick_delta = regen_timer
+		regen_timer = 0.0
 		
-	if current_mp < get_stat("max_mp"):
-		current_mp = min(current_mp + get_stat("mp_regen") * delta, get_stat("max_mp"))
-		
-	if current_stamina < get_stat("max_stamina"):
-		current_stamina = min(current_stamina + get_stat("stamina_regen") * delta, get_stat("max_stamina"))
+		if current_hp < get_stat("max_hp") and current_hp > 0:
+			current_hp = min(current_hp + get_stat("hp_regen") * tick_delta, get_stat("max_hp"))
+			health_changed.emit(current_hp, get_stat("max_hp"))
+			
+		if current_mp < get_stat("max_mp"):
+			current_mp = min(current_mp + get_stat("mp_regen") * tick_delta, get_stat("max_mp"))
+			
+		if current_stamina < get_stat("max_stamina"):
+			current_stamina = min(current_stamina + get_stat("stamina_regen") * tick_delta, get_stat("max_stamina"))
 	
-	# Xử lý Thời gian Status Effects
+	# Xử lý Thời gian Status Effects (Vẫn duy trì từng frame)
 	for i in range(active_effects.size() - 1, -1, -1):
 		var effect = active_effects[i]
 		if effect.process_effect(delta):

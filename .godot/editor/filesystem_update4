@@ -1,0 +1,5 @@
+res://entities/player/player.gd
+res://components/stats/stats_manager.gd
+res://entities/enemies/target_dummy.gd
+res://components/combat/hurtbox.gd
+res://components/combat/hitbox.gd

@@ -1,10 +1,21 @@
 [gd_scene format=3 uid="uid://c6lmnnu1pbxn6"]
 
 [ext_resource type="Script" uid="uid://d3dl2f4ux2ojg" path="res://entities/player/player.gd" id="1_xxx"]
+[ext_resource type="PackedScene" path="res://items/weapons/sword/sword.tscn" id="2_sword"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_xxx"]
+height = 1.5
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_xxx"]
+height = 1.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_head"]
+albedo_color = Color(0.8, 0.4, 0.1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_head"]
+material = SubResource("StandardMaterial3D_head")
+radius = 0.35
+height = 0.7
 
 
 
@@ -12,16 +23,27 @@
 script = ExtResource("1_xxx")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1069100266]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
 shape = SubResource("CapsuleShape3D_xxx")
 
 [node name="VisualPivot" type="Node3D" parent="."]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="VisualPivot" unique_id=1669650322]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
 mesh = SubResource("CapsuleMesh_xxx")
 
+[node name="HeadMesh" type="MeshInstance3D" parent="VisualPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+mesh = SubResource("SphereMesh_head")
+
 [node name="FaceMesh" type="CSGBox3D" parent="VisualPivot"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -0.5)
-size = Vector3(0.6, 0.2, 0.3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -0.35)
+size = Vector3(0.5, 0.15, 0.2)
+
+[node name="WeaponSocket" type="Node3D" parent="VisualPivot"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0.5, 0.2, -0.5)
+
+[node name="Sword" parent="VisualPivot/WeaponSocket" instance=ExtResource("2_sword")]
 
 [node name="SpringArm3D" type="SpringArm3D" parent="." unique_id=136719115]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.5, 0)
