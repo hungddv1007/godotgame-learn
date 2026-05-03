@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://c2n1g406x1pcb"]
+
+[ext_resource type="Script" path="res://weapon_effect_manager.gd" id="1_manager"]
+
+[node name="WeaponEffectManager" type="Node"]
+script = ExtResource("1_manager")

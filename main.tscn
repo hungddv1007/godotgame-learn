@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://do8t50pfyc3qf"]
+
+[ext_resource type="Shader" uid="uid://cotuyv05jqefh" path="res://player.gdshader" id="1_0xm2m"]
+[ext_resource type="PackedScene" uid="uid://c6lmnnu1pbxn6" path="res://player.tscn" id="1_yyy"]
+[ext_resource type="PackedScene" path="res://sword.tscn" id="3_h2yge"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yyy"]
+size = Vector3(50, 1, 50)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yyy"]
+albedo_color = Color(0.2, 0.6, 0.2, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_yyy"]
+material = SubResource("StandardMaterial3D_yyy")
+size = Vector3(50, 1, 50)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_h2yge"]
+render_priority = 0
+shader = ExtResource("1_0xm2m")
+shader_parameter/grid_scale = 10.0
+shader_parameter/color1 = Color(0.2, 0.6, 0.2, 1)
+shader_parameter/color2 = Color(0.1, 0.3, 0.1, 1)
+
+[node name="Main" type="Node3D" unique_id=283056955]
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1997763467]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=653982114]
+shape = SubResource("BoxShape3D_yyy")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=2101798346]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.035334587, -9.536743e-07, 0.024648666)
+mesh = SubResource("BoxMesh_yyy")
+surface_material_override/0 = SubResource("ShaderMaterial_h2yge")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1938871203]
+transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 0, 5, 0)
+shadow_enabled = true
+
+[node name="Player" parent="." unique_id=369361743 instance=ExtResource("1_yyy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="Sword" parent="." unique_id=1001840236 instance=ExtResource("3_h2yge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.9422295, 0.22499977, 0.8417573)
