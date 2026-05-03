@@ -1,0 +1,165 @@
+extends Node
+class_name StatsManager
+
+signal health_changed(current_hp, max_hp)
+signal stat_changed(stat_name, new_total_value)
+signal tag_added(tag_name)
+signal tag_removed(tag_name)
+signal died()
+
+enum ModifierType { FLAT, PERCENT }
+
+class StatData:
+	var base_value: float = 0.0
+	var flat_bonus: float = 0.0
+	var percent_bonus: float = 0.0
+	
+	func get_total() -> float:
+		return (base_value + flat_bonus) * (1.0 + percent_bonus)
+
+# 1. Khối Dữ liệu Chỉ số
+var stats: Dictionary = {}
+
+# Vitals
+var current_hp: float = 100.0
+var current_mp: float = 100.0
+var current_stamina: float = 100.0
+var current_shield: float = 0.0
+
+# 2. Khối Trạng thái & Tags
+var active_tags: Dictionary = {}
+var active_effects: Array[StatusEffect] = []
+
+func _ready():
+	_init_stat("max_hp", 100.0)
+	_init_stat("hp_regen", 1.0)
+	_init_stat("max_mp", 100.0)
+	_init_stat("mp_regen", 1.0)
+	_init_stat("max_stamina", 100.0)
+	_init_stat("stamina_regen", 5.0)
+	
+	# LoL Stats
+	_init_stat("armor", 0.0)
+	_init_stat("magic_resist", 0.0)
+	_init_stat("ability_haste", 0.0)
+	_init_stat("tenacity", 0.0) # Kháng hiệu ứng: 0.0 tới 1.0
+	
+	current_hp = get_stat("max_hp")
+	current_mp = get_stat("max_mp")
+	current_stamina = get_stat("max_stamina")
+
+func _init_stat(stat_name: String, base: float):
+	var stat = StatData.new()
+	stat.base_value = base
+	stats[stat_name] = stat
+
+func get_stat(stat_name: String) -> float:
+	if stats.has(stat_name):
+		return stats[stat_name].get_total()
+	return 0.0
+
+func add_modifier(stat_name: String, type: ModifierType, value: float):
+	if not stats.has(stat_name): return
+	var stat = stats[stat_name]
+	
+	if type == ModifierType.FLAT:
+		stat.flat_bonus += value
+	elif type == ModifierType.PERCENT:
+		stat.percent_bonus += value
+		
+	stat_changed.emit(stat_name, stat.get_total())
+	if stat_name == "max_hp":
+		health_changed.emit(current_hp, get_stat("max_hp"))
+
+func remove_modifier(stat_name: String, type: ModifierType, value: float):
+	if not stats.has(stat_name): return
+	var stat = stats[stat_name]
+	
+	if type == ModifierType.FLAT:
+		stat.flat_bonus -= value
+	elif type == ModifierType.PERCENT:
+		stat.percent_bonus -= value
+		
+	stat_changed.emit(stat_name, stat.get_total())
+	if stat_name == "max_hp":
+		health_changed.emit(current_hp, get_stat("max_hp"))
+
+# Gameplay Tags Logic
+func add_tag(tag_name: String):
+	if active_tags.has(tag_name):
+		active_tags[tag_name] += 1
+	else:
+		active_tags[tag_name] = 1
+		tag_added.emit(tag_name)
+
+func remove_tag(tag_name: String):
+	if active_tags.has(tag_name):
+		active_tags[tag_name] -= 1
+		if active_tags[tag_name] <= 0:
+			active_tags.erase(tag_name)
+			tag_removed.emit(tag_name)
+
+func has_tag(tag_name: String) -> bool:
+	return active_tags.has(tag_name) and active_tags[tag_name] > 0
+
+# Status Effects Logic
+func apply_status_effect(effect: StatusEffect):
+	var new_effect = effect.duplicate()
+	new_effect.on_apply(self)
+	active_effects.append(new_effect)
+
+func _process(delta: float):
+	# Xử lý Hồi phục Vitals
+	if current_hp < get_stat("max_hp") and current_hp > 0:
+		current_hp = min(current_hp + get_stat("hp_regen") * delta, get_stat("max_hp"))
+		health_changed.emit(current_hp, get_stat("max_hp"))
+		
+	if current_mp < get_stat("max_mp"):
+		current_mp = min(current_mp + get_stat("mp_regen") * delta, get_stat("max_mp"))
+		
+	if current_stamina < get_stat("max_stamina"):
+		current_stamina = min(current_stamina + get_stat("stamina_regen") * delta, get_stat("max_stamina"))
+	
+	# Xử lý Thời gian Status Effects
+	for i in range(active_effects.size() - 1, -1, -1):
+		var effect = active_effects[i]
+		if effect.process_effect(delta):
+			effect.on_remove()
+			active_effects.remove_at(i)
+
+# 3. Khối Đường ống Sát thương (Damage Pipeline)
+func take_damage(damage_data: DamageData):
+	if current_hp <= 0:
+		return
+		
+	var multiplier = 1.0
+	
+	if damage_data.damage_type == DamageData.DamageType.PHYSICAL:
+		# Giáp thực tế = (Giáp * (1 - Xuyên %)) - Xuyên thẳng
+		var effective_armor = max(0.0, (get_stat("armor") * (1.0 - damage_data.percent_pen)) - damage_data.flat_pen)
+		multiplier = 100.0 / (100.0 + effective_armor)
+	elif damage_data.damage_type == DamageData.DamageType.MAGIC:
+		# Kháng phép thực tế = (Kháng phép * (1 - Xuyên %)) - Xuyên thẳng
+		var effective_mr = max(0.0, (get_stat("magic_resist") * (1.0 - damage_data.percent_pen)) - damage_data.flat_pen)
+		multiplier = 100.0 / (100.0 + effective_mr)
+	# Đối với TRUE DAMAGE, multiplier luôn là 1.0 (giữ nguyên)
+		
+	var final_damage = damage_data.amount * multiplier
+	
+	# Xử lý trừ Khiên ảo (Shield) trước
+	if current_shield > 0:
+		if current_shield >= final_damage:
+			current_shield -= final_damage
+			final_damage = 0.0
+		else:
+			final_damage -= current_shield
+			current_shield = 0.0
+			
+	# Trừ HP thật
+	if final_damage > 0:
+		current_hp -= final_damage
+		health_changed.emit(current_hp, get_stat("max_hp"))
+		
+		if current_hp <= 0:
+			current_hp = 0
+			died.emit()

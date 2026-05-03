@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="PackedScene" path="res://weapon_effect_manager.tscn" id="1_effect_mgr"]
+[ext_resource type="PackedScene" path="res://components/weapon_effect/weapon_effect_manager.tscn" id="1_effect_mgr"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blade"]
 albedo_color = Color(0.8, 0.8, 0.8, 1)

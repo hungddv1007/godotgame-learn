@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://do8t50pfyc3qf"]
 
-[ext_resource type="Shader" uid="uid://cotuyv05jqefh" path="res://player.gdshader" id="1_0xm2m"]
-[ext_resource type="PackedScene" uid="uid://c6lmnnu1pbxn6" path="res://player.tscn" id="1_yyy"]
-[ext_resource type="PackedScene" path="res://sword.tscn" id="3_h2yge"]
+[ext_resource type="Shader" uid="uid://cotuyv05jqefh" path="res://entities/player/player.gdshader" id="1_0xm2m"]
+[ext_resource type="PackedScene" uid="uid://c6lmnnu1pbxn6" path="res://entities/player/player.tscn" id="1_yyy"]
+[ext_resource type="PackedScene" path="res://items/weapons/sword/sword.tscn" id="3_h2yge"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_yyy"]
 size = Vector3(50, 1, 50)
@@ -42,4 +42,4 @@ shadow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
 [node name="Sword" parent="." unique_id=1001840236 instance=ExtResource("3_h2yge")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.9422295, 0.22499977, 0.8417573)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.564647, 0.68654, 0.8417573)
