@@ -1,5 +1,10 @@
-res://entities/player/player.gd
-res://components/stats/stats_manager.gd
-res://entities/enemies/target_dummy.gd
-res://components/combat/hurtbox.gd
 res://components/combat/hitbox.gd
+res://components/stats/stats_manager.gd
+res://components/stats/status_effect.gd
+res://components/ui/active_effect_icon.gd
+res://components/ui/player_hud.gd
+res://data/effects/buff_effect.gd
+res://data/effects/dot_effect.gd
+res://data/effects/hot_effect.gd
+res://entities/player/player.gd
+res://items/weapons/sword/sword.tscn

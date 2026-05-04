@@ -9,6 +9,7 @@ func receive_damage(damage: DamageData):
 		if damage_multiplier != 1.0:
 			var modified_damage = damage.duplicate()
 			modified_damage.amount *= damage_multiplier
+			modified_damage.is_critical = true
 			stats_manager.take_damage(modified_damage)
 			print("Critical Hit! x", damage_multiplier)
 		else:

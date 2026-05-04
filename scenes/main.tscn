@@ -3,6 +3,7 @@
 [ext_resource type="Shader" uid="uid://cotuyv05jqefh" path="res://entities/player/player.gdshader" id="1_0xm2m"]
 [ext_resource type="PackedScene" uid="uid://c6lmnnu1pbxn6" path="res://entities/player/player.tscn" id="1_yyy"]
 [ext_resource type="PackedScene" path="res://entities/enemies/target_dummy.tscn" id="2_dummy"]
+[ext_resource type="Script" path="res://scenes/test_environment.gd" id="99_script"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_yyy"]
 size = Vector3(50, 1, 50)
@@ -22,6 +23,7 @@ shader_parameter/color1 = Color(0.2, 0.6, 0.2, 1)
 shader_parameter/color2 = Color(0.1, 0.3, 0.1, 1)
 
 [node name="Main" type="Node3D" unique_id=283056955]
+script = ExtResource("99_script")
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1997763467]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)

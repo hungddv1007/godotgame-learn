@@ -1,10 +1,17 @@
 extends Node
 class_name StatsManager
 
+static var show_damage_numbers: bool = true
+var floating_text_scene = preload("res://components/ui/floating_text.tscn")
+
 signal health_changed(current_hp, max_hp)
+signal mp_changed(current_mp, max_mp)
+signal stamina_changed(current_stamina, max_stamina)
 signal stat_changed(stat_name, new_total_value)
 signal tag_added(tag_name)
 signal tag_removed(tag_name)
+signal effect_applied(effect)
+signal effect_removed(effect)
 signal died()
 
 enum ModifierType { FLAT, PERCENT }
@@ -38,6 +45,9 @@ func _ready():
 	_init_stat("mp_regen", 1.0)
 	_init_stat("max_stamina", 100.0)
 	_init_stat("stamina_regen", 5.0)
+	
+	# Core Combat Stats
+	_init_stat("attack_damage", 25.0)
 	
 	# LoL Stats
 	_init_stat("armor", 0.0)
@@ -104,10 +114,38 @@ func has_tag(tag_name: String) -> bool:
 	return active_tags.has(tag_name) and active_tags[tag_name] > 0
 
 # Status Effects Logic
-func apply_status_effect(effect: StatusEffect):
+
+## Tìm hiệu ứng đang hoạt động theo ID
+func find_active_effect(effect_id: String) -> StatusEffect:
+	for active in active_effects:
+		if active.get_effect_id() == effect_id:
+			return active
+	return null
+
+func apply_status_effect(effect: StatusEffect) -> StatusEffect:
+	# Kiểm tra xem hiệu ứng cùng ID đã tồn tại trong mảng chưa
+	if effect.stackable:
+		var existing = find_active_effect(effect.get_effect_id())
+		if existing:
+			# CÓ: Cộng dồn - tăng stack, reset timer
+			existing.stack_effect()
+			effect_applied.emit(existing) # Emit lại để UI cập nhật
+			return existing
+	
+	# CHƯA CÓ hoặc không cho phép cộng dồn: Thêm mới vào mảng
 	var new_effect = effect.duplicate()
+	new_effect.current_stacks = 1
 	new_effect.on_apply(self)
 	active_effects.append(new_effect)
+	effect_applied.emit(new_effect)
+	return new_effect
+
+func remove_status_effect(effect: StatusEffect):
+	var index = active_effects.find(effect)
+	if index != -1:
+		effect.on_remove()
+		active_effects.remove_at(index)
+		effect_removed.emit(effect)
 
 func _process(delta: float):
 	# Xử lý Hồi phục Vitals (10 lần mỗi giây để tránh spam bộ nhớ)
@@ -122,9 +160,11 @@ func _process(delta: float):
 			
 		if current_mp < get_stat("max_mp"):
 			current_mp = min(current_mp + get_stat("mp_regen") * tick_delta, get_stat("max_mp"))
+			mp_changed.emit(current_mp, get_stat("max_mp"))
 			
 		if current_stamina < get_stat("max_stamina"):
 			current_stamina = min(current_stamina + get_stat("stamina_regen") * tick_delta, get_stat("max_stamina"))
+			stamina_changed.emit(current_stamina, get_stat("max_stamina"))
 	
 	# Xử lý Thời gian Status Effects (Vẫn duy trì từng frame)
 	for i in range(active_effects.size() - 1, -1, -1):
@@ -132,6 +172,7 @@ func _process(delta: float):
 		if effect.process_effect(delta):
 			effect.on_remove()
 			active_effects.remove_at(i)
+			effect_removed.emit(effect)
 
 # 3. Khối Đường ống Sát thương (Damage Pipeline)
 func take_damage(damage_data: DamageData):
@@ -165,6 +206,14 @@ func take_damage(damage_data: DamageData):
 	if final_damage > 0:
 		current_hp -= final_damage
 		health_changed.emit(current_hp, get_stat("max_hp"))
+		
+		# Hiện sát thương nhảy số
+		if show_damage_numbers and get_parent() is Node3D:
+			var text_node = floating_text_scene.instantiate()
+			get_parent().get_tree().current_scene.add_child(text_node)
+			var random_offset = Vector3(randf_range(-0.3, 0.3), randf_range(1.0, 1.5), randf_range(-0.3, 0.3))
+			text_node.global_position = get_parent().global_position + random_offset
+			text_node.setup(final_damage, damage_data.is_critical)
 		
 		if current_hp <= 0:
 			current_hp = 0

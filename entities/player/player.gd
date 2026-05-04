@@ -19,6 +19,7 @@ var attack_cooldown = 0.0
 var is_attacking = false
 
 @onready var weapon_socket = $VisualPivot/WeaponSocket
+@onready var stats_manager = $StatsManager
 
 func _ready():
 	spring_arm.top_level = true
@@ -121,6 +122,21 @@ func perform_attack():
 	if sword_hitbox:
 		if sword_hitbox.has_method("clear_hit_history"):
 			sword_hitbox.clear_hit_history()
+		
+		# === DYNAMIC DAMAGE CALCULATION ===
+		# Lấy chỉ số Sức mạnh/Tấn công hiện tại từ StatsManager (bao gồm cả buff)
+		var current_atk = stats_manager.get_stat("attack_damage")
+		
+		# Tạo DamageData động dựa trên chỉ số hiện tại của người chơi
+		var dynamic_damage = DamageData.new()
+		dynamic_damage.amount = current_atk
+		dynamic_damage.damage_type = DamageData.DamageType.PHYSICAL
+		# Có thể mở rộng thêm pen từ stats sau này:
+		# dynamic_damage.flat_pen = stats_manager.get_stat("flat_armor_pen")
+		# dynamic_damage.percent_pen = stats_manager.get_stat("percent_armor_pen")
+		
+		# Truyền DamageData động vào Hitbox
+		sword_hitbox.set_damage_data(dynamic_damage)
 		sword_hitbox.monitoring = true
 		
 	# Tạo Animation chém kiếm bằng Tween

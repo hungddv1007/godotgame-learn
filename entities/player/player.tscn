@@ -2,6 +2,9 @@
 
 [ext_resource type="Script" uid="uid://d3dl2f4ux2ojg" path="res://entities/player/player.gd" id="1_xxx"]
 [ext_resource type="PackedScene" path="res://items/weapons/sword/sword.tscn" id="2_sword"]
+[ext_resource type="PackedScene" path="res://components/stats/stats_manager.tscn" id="3_stats"]
+[ext_resource type="PackedScene" path="res://components/ui/player_debug_ui.tscn" id="4_debugui"]
+[ext_resource type="PackedScene" path="res://components/ui/player_hud.tscn" id="5_hud"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_xxx"]
 height = 1.5
@@ -51,3 +54,11 @@ spring_length = 4.0
 margin = 0.5
 
 [node name="Camera3D" type="Camera3D" parent="SpringArm3D" unique_id=47197814]
+
+[node name="StatsManager" parent="." instance=ExtResource("3_stats")]
+
+[node name="PlayerHUD" parent="." node_paths=PackedStringArray("stats_manager") instance=ExtResource("5_hud")]
+stats_manager = NodePath("../StatsManager")
+
+[node name="PlayerDebugUI" parent="." node_paths=PackedStringArray("stats_manager") instance=ExtResource("4_debugui")]
+stats_manager = NodePath("../StatsManager")
