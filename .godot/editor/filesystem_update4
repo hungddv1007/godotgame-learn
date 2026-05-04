@@ -12,3 +12,4 @@ res://components/ui/player_hud.tscn
 res://items/weapons/flying_sword/flying_sword.gd
 res://scenes/main.tscn
 res://items/weapons/flying_sword/flying_sword.tscn
+res://scenes/test_environment.gd

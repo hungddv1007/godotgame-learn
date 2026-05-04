@@ -16,6 +16,7 @@ var fly_direction: Vector3 = Vector3.FORWARD # Hướng bay thực tế (tính t
 var hit_entities: Array[Node] = []
 var owner_node: Node = null # Người sở hữu (player) để không tự đánh bản thân
 var is_destroyed: bool = false
+var on_hit_effects: Array = [] # Hiệu ứng áp dụng khi trúng đích
 
 func _ready():
 	# Bắt đầu ở scale rất nhỏ (không dùng ZERO vì Jolt Physics không chấp nhận singular transform)
@@ -28,11 +29,12 @@ func _ready():
 	# Bắt đầu vòng đời
 	_start_spawn_phase()
 
-## Thiết lập dữ liệu sát thương và mục tiêu từ bên ngoài
-func setup(p_damage_data: DamageData, p_aim_target: Vector3, p_owner: Node) -> void:
+## Thiết lập dữ liệu sát thương, mục tiêu, và hiệu ứng khi trúng
+func setup(p_damage_data: DamageData, p_aim_target: Vector3, p_owner: Node, p_effects: Array = []) -> void:
 	damage_data = p_damage_data
 	aim_target = p_aim_target
 	owner_node = p_owner
+	on_hit_effects = p_effects
 
 ## === GIAI ĐOẠN 1: SPAWN - Hiện ra từ từ ===
 func _start_spawn_phase():
@@ -101,6 +103,11 @@ func _on_area_entered(area: Area3D):
 		# Truyền sát thương
 		if damage_data:
 			area.receive_damage(damage_data)
+		
+		# Áp dụng hiệu ứng on-hit (cháy, độc, v.v.)
+		if area.stats_manager and on_hit_effects.size() > 0:
+			for effect in on_hit_effects:
+				area.stats_manager.apply_status_effect(effect)
 		
 		# Thanh kiếm tự hủy sau khi trúng mục tiêu
 		_destroy()
