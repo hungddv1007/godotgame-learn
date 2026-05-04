@@ -33,15 +33,25 @@ func _ready():
 	
 	# Pre-warm: Instantiate rồi free ngay 1 thanh kiếm ẩn để Godot compile shader trước
 	# Tránh hiện tượng "đơ" (stutter) khi click lần đầu tiên
-	_prewarm_flying_sword()
+	# Phải call_deferred vì scene tree đang bận setup children trong _ready()
+	_prewarm_flying_sword.call_deferred()
 
 func _prewarm_flying_sword():
-	var dummy_sword = flying_sword_scene.instantiate()
-	dummy_sword.visible = false
-	dummy_sword.set_physics_process(false)
-	add_child(dummy_sword)
-	# Xóa ngay frame sau khi shader đã compile
-	dummy_sword.queue_free()
+	var dummy = flying_sword_scene.instantiate()
+	dummy.set_physics_process(false)
+	dummy.set_process(false)
+	dummy.set_deferred("monitoring", false)
+	dummy.set_deferred("monitorable", false)
+	get_tree().current_scene.add_child(dummy)
+	dummy.global_position = Vector3(0, -999, 0)
+	dummy.scale = Vector3.ONE
+	# Đợi 2 frame để GPU render xong rồi xóa
+	get_tree().process_frame.connect(func():
+		get_tree().process_frame.connect(func():
+			if is_instance_valid(dummy):
+				dummy.queue_free()
+		, CONNECT_ONE_SHOT)
+	, CONNECT_ONE_SHOT)
 
 # === BUG FIX #1: Dùng _input thay vì _unhandled_input ===
 # CanvasLayer (PlayerHUD) ăn hết mouse event trước khi tới _unhandled_input.
