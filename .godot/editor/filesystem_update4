@@ -8,3 +8,7 @@ res://data/effects/dot_effect.gd
 res://data/effects/hot_effect.gd
 res://entities/player/player.gd
 res://items/weapons/sword/sword.tscn
+res://components/ui/player_hud.tscn
+res://items/weapons/flying_sword/flying_sword.gd
+res://scenes/main.tscn
+res://items/weapons/flying_sword/flying_sword.tscn

@@ -8,6 +8,9 @@ var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
 @onready var spring_arm = $SpringArm3D
 @onready var visual_pivot = $VisualPivot
+@onready var stats_manager = $StatsManager
+@onready var camera: Camera3D = $SpringArm3D/Camera3D
+
 @export var mouse_sensitivity = 0.003
 
 var idle_time = 0.0
@@ -15,16 +18,40 @@ var combat_timer = 0.0
 var is_in_combat = false
 var turn_speed = 10.0
 
-var attack_cooldown = 0.0
-var is_attacking = false
-
-@onready var weapon_socket = $VisualPivot/WeaponSocket
-@onready var stats_manager = $StatsManager
+# === GATE OF BABYLON SYSTEM ===
+var flying_sword_scene = preload("res://items/weapons/flying_sword/flying_sword.tscn")
+var attack_cooldown_timer: float = 0.0 # Bộ đếm ngược giữa các lần bắn
+var last_sword_offset: Vector2 = Vector2.ZERO # Vết vị trí kiếm cuối cùng (thuật toán rải đều)
+const MIN_SWORD_DISTANCE: float = 1.5 # Khoảng cách tối thiểu giữa các thanh kiếm
+const SPAWN_BEHIND_DISTANCE: float = 1.5 # Khoảng cách sau lưng
+const MAX_SPAWN_ATTEMPTS: int = 10 # Số lần thử random tối đa
 
 func _ready():
 	spring_arm.top_level = true
 	spring_arm.add_excluded_object(self.get_rid())
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	
+	# Pre-warm: Instantiate rồi free ngay 1 thanh kiếm ẩn để Godot compile shader trước
+	# Tránh hiện tượng "đơ" (stutter) khi click lần đầu tiên
+	_prewarm_flying_sword()
+
+func _prewarm_flying_sword():
+	var dummy_sword = flying_sword_scene.instantiate()
+	dummy_sword.visible = false
+	dummy_sword.set_physics_process(false)
+	add_child(dummy_sword)
+	# Xóa ngay frame sau khi shader đã compile
+	dummy_sword.queue_free()
+
+# === BUG FIX #1: Dùng _input thay vì _unhandled_input ===
+# CanvasLayer (PlayerHUD) ăn hết mouse event trước khi tới _unhandled_input.
+# _input luôn nhận event trước tất cả UI nodes.
+func _input(event):
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		spring_arm.rotation.y -= event.relative.x * mouse_sensitivity
+		spring_arm.rotation.x -= event.relative.y * mouse_sensitivity
+		spring_arm.rotation.x = clamp(spring_arm.rotation.x, deg_to_rad(-60), deg_to_rad(60))
+		get_viewport().set_input_as_handled()
 
 func _unhandled_input(event):
 	if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed:
@@ -33,28 +60,24 @@ func _unhandled_input(event):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		if Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-			
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		spring_arm.rotation.y -= event.relative.x * mouse_sensitivity
-		spring_arm.rotation.x -= event.relative.y * mouse_sensitivity
-		spring_arm.rotation.x = clamp(spring_arm.rotation.x, deg_to_rad(-60), deg_to_rad(60))
 
 func _physics_process(delta):
 	# Update SpringArm3D position
 	var target_pos = global_position + Vector3(0, 1.5, 0) + spring_arm.global_transform.basis.x * 0.5
 	spring_arm.global_position = spring_arm.global_position.lerp(target_pos, 20.0 * delta)
 
-	# Combat State Logic
-	if attack_cooldown > 0:
-		attack_cooldown -= delta
+	# === ATTACK SPEED COOLDOWN ===
+	if attack_cooldown_timer > 0:
+		attack_cooldown_timer -= delta
 
+	# === COMBAT STATE & FIRE SWORD ===
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		is_in_combat = true
 		combat_timer = 0.0
 		
-		# Kích hoạt chém nếu dùng chuột trái
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_attacking and attack_cooldown <= 0:
-			perform_attack()
+		# Giữ chuột trái → Bắn liên tục theo Attack Speed
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and attack_cooldown_timer <= 0:
+			fire_sword()
 			
 	elif is_in_combat:
 		combat_timer += delta
@@ -113,49 +136,111 @@ func _physics_process(delta):
 
 	move_and_slide()
 
-func perform_attack():
-	is_attacking = true
-	attack_cooldown = 0.6
+# =========================================================
+#  MODULE 1: TÂM NGẮM & NHẮM BẮN TPS
+# =========================================================
+
+## Bắn Raycast từ Camera xuyên qua giữa màn hình → trả về tọa độ mục tiêu
+func get_aim_target() -> Vector3:
+	var viewport = get_viewport()
+	var screen_center = viewport.get_visible_rect().size / 2.0
 	
-	# Lấy Hitbox của thanh kiếm và bật lên
-	var sword_hitbox = weapon_socket.get_node("Sword/Hitbox")
-	if sword_hitbox:
-		if sword_hitbox.has_method("clear_hit_history"):
-			sword_hitbox.clear_hit_history()
+	# Tạo ray từ camera xuyên qua tâm màn hình
+	var ray_origin = camera.project_ray_origin(screen_center)
+	var ray_direction = camera.project_ray_normal(screen_center)
+	var ray_end = ray_origin + ray_direction * 1000.0
+	
+	# Dùng PhysicsDirectSpaceState3D để raycast
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	query.exclude = [self.get_rid()] # Loại trừ chính người chơi
+	query.collision_mask = 0xFFFFFFFF # Tất cả layer
+	
+	var result = space_state.intersect_ray(query)
+	
+	if result:
+		# Tia trúng vật thể/mặt đất → trả về điểm va chạm
+		return result.position
+	else:
+		# Không trúng gì → trả về điểm cực xa theo hướng camera
+		return ray_origin + ray_direction * 1000.0
+
+# =========================================================
+#  MODULE 3: PHÓNG KIẾM (FIRE SWORD)
+# =========================================================
+
+func fire_sword():
+	# Tính cooldown dựa trên Attack Speed
+	var atk_speed = stats_manager.get_stat("attack_speed")
+	attack_cooldown_timer = 1.0 / atk_speed
+	
+	# Lấy mục tiêu ngắm
+	var aim_target = get_aim_target()
+	
+	# Tạo DamageData động từ StatsManager
+	var current_atk = stats_manager.get_stat("attack_damage")
+	var damage = DamageData.new()
+	damage.amount = current_atk
+	damage.damage_type = DamageData.DamageType.PHYSICAL
+	
+	# Tính vị trí spawn sau lưng người chơi
+	var spawn_pos = _calculate_spawn_position()
+	
+	# Instantiate thanh kiếm bay
+	var sword = flying_sword_scene.instantiate()
+	get_tree().current_scene.add_child(sword)
+	sword.global_position = spawn_pos
+	sword.setup(damage, aim_target, self)
+
+# =========================================================
+#  MODULE 4: THUẬT TOÁN SINH KIẾM SAU LƯNG
+# =========================================================
+
+func _calculate_spawn_position() -> Vector3:
+	# Random một Vector2(x, y) trên mặt phẳng sau lưng
+	var new_offset = _get_spread_offset()
+	last_sword_offset = new_offset
+	
+	# Chuyển đổi Vector2 sang hệ tọa độ 3D cục bộ sau lưng player
+	# Trục X: sang ngang (local X)
+	# Trục Y: lên trên (world Y)
+	# Trục Z: lùi về sau (local +Z = behind)
+	var player_basis = visual_pivot.global_transform.basis
+	var behind_dir = player_basis.z.normalized() # +Z = phía sau
+	var right_dir = player_basis.x.normalized()  # +X = phải
+	
+	var spawn_pos = global_position
+	spawn_pos += behind_dir * SPAWN_BEHIND_DISTANCE  # Dịch lùi sau lưng
+	spawn_pos += right_dir * new_offset.x             # Dịch ngang
+	spawn_pos += Vector3.UP * (new_offset.y + 1.0)    # Dịch lên (offset + chiều cao cơ bản)
+	
+	return spawn_pos
+
+## Thuật toán rải đều: đảm bảo mỗi thanh kiếm không spawn quá gần thanh trước
+func _get_spread_offset() -> Vector2:
+	var new_offset: Vector2
+	var attempts = 0
+	
+	while attempts < MAX_SPAWN_ATTEMPTS:
+		new_offset = Vector2(
+			randf_range(-2.0, 2.0),  # X: trái/phải
+			randf_range(0.5, 2.5)    # Y: cao/thấp
+		)
 		
-		# === DYNAMIC DAMAGE CALCULATION ===
-		# Lấy chỉ số Sức mạnh/Tấn công hiện tại từ StatsManager (bao gồm cả buff)
-		var current_atk = stats_manager.get_stat("attack_damage")
+		# Nếu là thanh kiếm đầu tiên (offset = ZERO) thì chấp nhận luôn
+		if last_sword_offset == Vector2.ZERO:
+			break
 		
-		# Tạo DamageData động dựa trên chỉ số hiện tại của người chơi
-		var dynamic_damage = DamageData.new()
-		dynamic_damage.amount = current_atk
-		dynamic_damage.damage_type = DamageData.DamageType.PHYSICAL
-		# Có thể mở rộng thêm pen từ stats sau này:
-		# dynamic_damage.flat_pen = stats_manager.get_stat("flat_armor_pen")
-		# dynamic_damage.percent_pen = stats_manager.get_stat("percent_armor_pen")
+		# Kiểm tra khoảng cách với vị trí thanh kiếm cuối
+		if new_offset.distance_to(last_sword_offset) >= MIN_SWORD_DISTANCE:
+			break
 		
-		# Truyền DamageData động vào Hitbox
-		sword_hitbox.set_damage_data(dynamic_damage)
-		sword_hitbox.monitoring = true
+		# Quá gần → đảo ngược dấu để đẩy sang góc khác
+		if attempts > MAX_SPAWN_ATTEMPTS / 2.0:
+			new_offset.x *= -1.0
+		if attempts > MAX_SPAWN_ATTEMPTS * 3.0 / 4.0:
+			new_offset.y = 3.0 - new_offset.y # Đảo trục Y
 		
-	# Tạo Animation chém kiếm bằng Tween
-	var tween = create_tween()
+		attempts += 1
 	
-	# Vung kiếm ra sau (Windup)
-	tween.tween_property(weapon_socket, "rotation_degrees:x", 120.0, 0.1)
-	tween.parallel().tween_property(weapon_socket, "rotation_degrees:z", 45.0, 0.1)
-	
-	# Chém mạnh tới trước (Swing)
-	tween.tween_property(weapon_socket, "rotation_degrees:x", -30.0, 0.15)
-	tween.parallel().tween_property(weapon_socket, "rotation_degrees:z", -45.0, 0.15)
-	
-	# Thu kiếm về (Recovery)
-	tween.tween_property(weapon_socket, "rotation_degrees:x", 90.0, 0.2).set_delay(0.1)
-	tween.parallel().tween_property(weapon_socket, "rotation_degrees:z", 0.0, 0.2).set_delay(0.1)
-	
-	tween.tween_callback(func():
-		is_attacking = false
-		if sword_hitbox:
-			sword_hitbox.monitoring = false
-	)
+	return new_offset

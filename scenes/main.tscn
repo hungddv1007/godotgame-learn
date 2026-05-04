@@ -3,7 +3,7 @@
 [ext_resource type="Shader" uid="uid://cotuyv05jqefh" path="res://entities/player/player.gdshader" id="1_0xm2m"]
 [ext_resource type="PackedScene" uid="uid://c6lmnnu1pbxn6" path="res://entities/player/player.tscn" id="1_yyy"]
 [ext_resource type="PackedScene" path="res://entities/enemies/target_dummy.tscn" id="2_dummy"]
-[ext_resource type="Script" path="res://scenes/test_environment.gd" id="99_script"]
+[ext_resource type="Script" uid="uid://dyxgvh8164r4d" path="res://scenes/test_environment.gd" id="99_script"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_yyy"]
 size = Vector3(50, 1, 50)
@@ -43,5 +43,5 @@ shadow_enabled = true
 [node name="Player" parent="." unique_id=369361743 instance=ExtResource("1_yyy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
-[node name="TargetDummy" parent="." instance=ExtResource("2_dummy")]
+[node name="TargetDummy" parent="." unique_id=1717968253 instance=ExtResource("2_dummy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -4)

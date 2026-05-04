@@ -48,6 +48,7 @@ func _ready():
 	
 	# Core Combat Stats
 	_init_stat("attack_damage", 25.0)
+	_init_stat("attack_speed", 1.0) # Tốc độ đánh: số kiếm bắn ra mỗi giây
 	
 	# LoL Stats
 	_init_stat("armor", 0.0)
