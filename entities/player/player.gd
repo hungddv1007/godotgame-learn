@@ -18,6 +18,9 @@ var combat_timer = 0.0
 var is_in_combat = false
 var turn_speed = 10.0
 
+# === PICKUP SYSTEM ===
+var nearby_pickup = null # Reference to current nearby pickup item
+
 # === GATE OF BABYLON SYSTEM ===
 signal weapon_changed(weapon_data) # Signal thông báo UI khi đổi vũ khí
 
@@ -97,12 +100,50 @@ func _init_weapons():
 	# Mặc định dùng phi kiếm thường
 	equip_weapon("normal")
 
-## Đổi vũ khí — được gọi từ WeaponZone hoặc phím tắt
+## Đổi vũ khí — được gọi từ WeaponZone, Pickup hoặc phím tắt
 func equip_weapon(weapon_key: String) -> void:
 	if _weapon_definitions.has(weapon_key):
 		current_weapon = _weapon_definitions[weapon_key]
 		weapon_changed.emit(current_weapon)
 		print("[Weapon] Đã trang bị: ", current_weapon.weapon_name)
+
+# =========================================================
+#  PICKUP INTERACTION
+# =========================================================
+
+func on_pickup_enter(pickup) -> void:
+	nearby_pickup = pickup
+	$PlayerHUD.show_pickup_prompt(pickup)
+
+func on_pickup_exit(pickup) -> void:
+	if nearby_pickup == pickup:
+		nearby_pickup = null
+		$PlayerHUD.hide_pickup_prompt()
+
+func _handle_pickup_collect() -> void:
+	if not nearby_pickup or nearby_pickup._is_collected:
+		return
+	var pickup = nearby_pickup
+	
+	if pickup.pickup_type == 0: # WEAPON
+		equip_weapon(pickup.weapon_key)
+		print("[Pickup] Nhặt vũ khí: ", pickup.item_name)
+	else: # ENHANCEMENT
+		var mod_type = StatsManager.ModifierType.PERCENT if pickup.modifier_is_percent else StatsManager.ModifierType.FLAT
+		stats_manager.add_modifier(pickup.stat_name, mod_type, pickup.modifier_value)
+		print("[Pickup] Cường hóa: ", pickup.item_name, " (", pickup.stat_name, " +", pickup.modifier_value, ")")
+	
+	pickup.collect()
+	nearby_pickup = null
+	$PlayerHUD.hide_pickup_prompt()
+
+func _handle_pickup_decompose() -> void:
+	if not nearby_pickup or nearby_pickup._is_collected:
+		return
+	print("[Pickup] Phân rã: ", nearby_pickup.item_name)
+	nearby_pickup.decompose()
+	nearby_pickup = null
+	$PlayerHUD.hide_pickup_prompt()
 
 func _prewarm_flying_sword():
 	# Pre-warm tất cả scene kiếm để tránh stutter lần đầu
@@ -133,9 +174,19 @@ func _input(event):
 		get_viewport().set_input_as_handled()
 
 func _unhandled_input(event):
-	if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if event is InputEventKey and event.pressed:
+		# Pickup interaction
+		if nearby_pickup:
+			if event.keycode == KEY_E:
+				_handle_pickup_collect()
+				return
+			elif event.keycode == KEY_Q:
+				_handle_pickup_decompose()
+				return
 		
+		if event.keycode == KEY_ESCAPE:
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		if Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

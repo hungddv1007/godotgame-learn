@@ -40,10 +40,6 @@ func setup(p_damage_data: DamageData, p_aim_target: Vector3, p_owner: Node, p_ef
 func _start_spawn_phase():
 	current_phase = Phase.SPAWN
 	
-	# Hướng mũi kiếm sơ bộ về phía mục tiêu
-	if aim_target != Vector3.ZERO and global_position.distance_to(aim_target) > 0.1:
-		look_at(aim_target, Vector3.UP)
-	
 	# Tween scale từ 0.01 lên 1
 	var tween = create_tween()
 	tween.tween_property(self, "scale", Vector3.ONE, spawn_time)\
@@ -59,30 +55,37 @@ func _start_hover_phase():
 	timer.timeout.connect(_start_launch_phase)
 
 ## === GIAI ĐOẠN 3: LAUNCH - Phóng về phía trước ===
-## Tính Direction Vector tại thời điểm launch
 func _start_launch_phase():
 	current_phase = Phase.LAUNCH
 	
+	# Cập nhật aim_target lần cuối từ player trước khi phóng
+	if owner_node and owner_node.has_method("get_aim_target"):
+		aim_target = owner_node.get_aim_target()
+	
 	# === VECTOR TARGETING ===
-	# Tính hướng bay chính xác từ vị trí HIỆN TẠI của kiếm đến Impact Point
 	if aim_target != Vector3.ZERO and global_position.distance_to(aim_target) > 0.1:
 		fly_direction = (aim_target - global_position).normalized()
-		# Quay mũi kiếm theo hướng bay thực tế
 		look_at(global_position + fly_direction, Vector3.UP)
 	else:
 		fly_direction = -global_transform.basis.z.normalized()
 	
-	# Bật va chạm để phát hiện trúng đích
-	# Dùng set_deferred để tránh lỗi "Function blocked during in/out signal"
+	# Bật va chạm
 	set_deferred("monitoring", true)
 	
-	# Bật timer tự hủy (lifetime)
+	# Timer tự hủy
 	var death_timer = get_tree().create_timer(lifetime)
 	death_timer.timeout.connect(_on_lifetime_expired)
 
 func _physics_process(delta: float):
-	if current_phase == Phase.LAUNCH:
-		# Di chuyển theo fly_direction đã tính (Vector Targeting)
+	if current_phase == Phase.SPAWN or current_phase == Phase.HOVER:
+		# === REAL-TIME TRACKING ===
+		# Liên tục xoay mũi kiếm theo hồng tâm của player trong lúc lơ lửng
+		if owner_node and owner_node.has_method("get_aim_target"):
+			var current_target = owner_node.get_aim_target()
+			if global_position.distance_to(current_target) > 0.1:
+				look_at(current_target, Vector3.UP)
+	elif current_phase == Phase.LAUNCH:
+		# Di chuyển theo fly_direction đã tính (cố định tại thời điểm launch)
 		global_position += fly_direction * fly_speed * delta
 
 ## === XỬ LÝ VA CHẠM ===
